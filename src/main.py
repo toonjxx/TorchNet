@@ -1,7 +1,8 @@
 from utils import load_config
 import torch
-from data_loader import create_data_loader
-from custom_dataset import CustomDataset
+from data_loader import create_data_loader,train_val_dataloader
+
+
 # Load settings from the config file
 config = load_config()
 
@@ -11,13 +12,15 @@ num_channels = config["num_channels"]
 batch_size = config["batch_size"]
 
 # Create data loaders
-train_dataloader = create_data_loader("Train", batch_size)
+train_dataloader,val_dataloader = train_val_dataloader("Train", batch_size)
 test_dataloader = create_data_loader("Test", batch_size)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Example usage:
 if __name__ == "__main__":
     print("Loaded custom dataset.")
     print(f"Number of batches in the train DataLoader: {len(train_dataloader)}")
+    print(f"Number of batches in the val DataLoader: {len(val_dataloader)}")
     print(f"Number of batches in the test DataLoader: {len(test_dataloader)}")
 
     for batch_idx, (features, labels) in enumerate(train_dataloader):
