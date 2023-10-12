@@ -41,6 +41,7 @@ class CustomDataset(Dataset):
 
         # Convert to PyTorch tensors
         data = torch.FloatTensor(data.values)
+        data = data.permute(1,0)
         if labels is not None:
             labels = torch.FloatTensor(labels)
         return data, labels
@@ -52,3 +53,4 @@ class CustomDataset(Dataset):
         except Exception as e:
             print(f"Error loading CSV file {sample_csv_file}: {str(e)}")
             return None
+        
