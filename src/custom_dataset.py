@@ -1,7 +1,8 @@
+from math import e
 import os
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
 
 # Define a custom PyTorch dataset class for your time series data
 class CustomDataset(Dataset):
@@ -28,20 +29,26 @@ class CustomDataset(Dataset):
         labels_row = self.labels_df.iloc[idx,:]
         if not labels_row.empty:
             if label_select == "BP":
-                SBP = labels_row["SBP"]
-                DBP = labels_row["DBP"]
+                SBP = (labels_row["SBP"]-30)/170
+                DBP = (labels_row["DBP"]-30)/170
                 labels = pd.array([SBP,DBP])
-
             elif label_select == "Hypertension":
-                labels = labels_row["Hypertension"]
+                isHyper = labels_row["Hypertension"]
+                labels = pd.array([isHyper])
+            elif label_select == "SBP":
+                SBP = (labels_row["SBP"]-30)/170
+                labels = pd.array([SBP])
+            elif label_select == "DBP":
+                DBP = (labels_row["DBP"]-30)/170
+                labels = pd.array([DBP])
             else:
                 labels = None
         else:
             labels = None  # Handle cases where labels are not found
 
         # Convert to PyTorch tensors
-        data = torch.FloatTensor(data.values)
-        data = data.permute(1,0)
+        if data is not None:
+            data = torch.FloatTensor(data.values)
         if labels is not None:
             labels = torch.FloatTensor(labels)
         return data, labels

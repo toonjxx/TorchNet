@@ -18,10 +18,10 @@ class Block(nn.Module):
     def __init__(self, dim, drop_path=0., layer_scale_init_value=1e-6):
         super().__init__()
         self.dwconv = nn.Conv1d(dim, dim, kernel_size=7, padding=3, groups=dim) # depthwise conv
-        self.norm = nn.LayerNorm(dim, eps=1e-6)
-        self.pwconv1 = nn.Linear(dim, 4 * dim) # pointwise/1x1 convs, implemented with linear layers
+        self.norm = LayerNorm(dim, eps=1e-6,data_format="channels_first")
+        self.pwconv1 = nn.Conv1d(dim, 4 * dim, kernel_size=1, stride=1, padding=0, groups=1) # pointwise/1x1 convs, implemented with linear layers
         self.act = nn.GELU()
-        self.pwconv2 = nn.Linear(4 * dim, dim)
+        self.pwconv2 = nn.Conv1d(4*dim, dim, kernel_size=1, stride=1, padding=0, groups=1)
         self.gamma = nn.Parameter(layer_scale_init_value * torch.ones((dim)), 
                                     requires_grad=True) if layer_scale_init_value > 0 else None
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
@@ -29,15 +29,14 @@ class Block(nn.Module):
     def forward(self, x):
         input = x
         x = self.dwconv(x)
-        x = x.permute(0, 2, 1) # (N, C, W) -> (N, W, C)
         x = self.norm(x)
         x = self.pwconv1(x)
         x = self.act(x)
         x = self.pwconv2(x)
+        x = x.permute(0, 2, 1)
         if self.gamma is not None:
             x = self.gamma * x
-        x = x.permute(0, 2, 1) # (N, W, C) -> (N, C, W)
-
+        x = x.permute(0, 2, 1)
         x = input + self.drop_path(x)
         return x
 
@@ -64,12 +63,12 @@ class ConvNeXt(nn.Module):
         self.downsample_layers = nn.ModuleList() # stem and 3 intermediate downsampling conv layers
         stem = nn.Sequential(
             nn.Conv1d(in_chans, dims[0], kernel_size=4, stride=4),
-            nn.LayerNorm(dims[0], eps=1e-6)
+            LayerNorm(dims[0], eps=1e-6)
         )
         self.downsample_layers.append(stem)
         for i in range(3):
             downsample_layer = nn.Sequential(
-                    nn.LayerNorm(dims[i], eps=1e-6),
+                    LayerNorm(dims[i], eps=1e-6),
                     nn.Conv1d(dims[i], dims[i+1], kernel_size=2, stride=2),
             )
             self.downsample_layers.append(downsample_layer)
@@ -85,7 +84,7 @@ class ConvNeXt(nn.Module):
             self.stages.append(stage)
             cur += depths[i]
 
-        self.norm = nn.LayerNorm(dims[-1], eps=1e-6) # final norm layer
+        self.norm = LayerNorm(dims[-1], eps=1e-6) # final norm layer
         self.head = nn.Linear(dims[-1], num_classes)
 
         self.apply(self._init_weights)
@@ -95,21 +94,26 @@ class ConvNeXt(nn.Module):
     def _init_weights(self, m):
         if isinstance(m, (nn.Conv1d, nn.Linear)):
             trunc_normal_(m.weight, std=.02)
-            nn.init.constant_(m.bias, 0)
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
 
     def forward_features(self, x):
         for i in range(4):
             x = self.downsample_layers[i](x)
             x = self.stages[i](x)
-        return self.norm(x.mean([-2, -1])) # global average pooling, (N, C, H, W) -> (N, C)
+        x = x.mean([-1]) # global average pooling
+        x = nn.BatchNorm1d(x.shape[-1],device=self.norm.weight.device)(x)
+        return x 
 
     def forward(self, x):
+        x = x.permute(0,2,1)
         x = self.forward_features(x)
         x = self.head(x)
+        x = nn.Sigmoid()(x)
         return x
-"""
+
 class LayerNorm(nn.Module):
-    def __init__(self, normalized_shape, eps=1e-6, data_format="channels_last"):
+    def __init__(self, normalized_shape, eps=1e-6, data_format="channels_first"):
         super().__init__()
         self.weight = nn.Parameter(torch.ones(normalized_shape))
         self.bias = nn.Parameter(torch.zeros(normalized_shape))
@@ -128,4 +132,3 @@ class LayerNorm(nn.Module):
             x = (x - u) / torch.sqrt(s + self.eps)
             x = self.weight[:,  None] * x + self.bias[:, None]
             return x
-"""
