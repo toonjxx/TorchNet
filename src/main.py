@@ -24,13 +24,20 @@ if __name__ == "__main__":
     models = []
     trainers = []
     for fold_idx, (train_dataloader, val_dataloader) in enumerate(dataloaders):
-        model = ConvNeXt(depths=[1, 1, 3, 1], dims=[256, 256, 256, 256],in_chans=1,num_classes=1).to(device)
+        model = ConvNeXt(depths=[3, 3, 9, 3], dims=[96, 192, 384, 768],in_chans=1,num_classes=1).to(device)
         models.append(model)
-        trainer = Trainer_Hyper(model, train_dataloader, val_dataloader, num_epochs=20, learning_rate=0.001,log_dir=f"logs/test")
+        trainer = Trainer_Hyper(model, train_dataloader, val_dataloader, num_epochs=30, learning_rate=0.001,log_dir=f"logs/test")
         trainers.append(trainer)
+    val_acc = []
+    train_acc = []
     for i in range(k):
         print(f"Training model {i+1}/{k}")
-        trainers[i].train()
+        train,val=trainers[i].train()
+        val_acc.append(val)
+        train_acc.append(train)
+    print(f"Average train accuracy: {sum(train_acc)/k}")
+    print(f"Average val accuracy: {sum(val_acc)/k}")
+
 
 '''
     # Evaluate the models on the test set
