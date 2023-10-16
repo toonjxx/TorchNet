@@ -42,7 +42,7 @@ def train_val_dataloader_kfold(split, batch_size, k=5):
     labels_file = Path(os.path.join(data_dir,'Label.csv'))
     dataset = CustomDataset(data_dir, labels_file,label_select="Hypertension")
     kf = KFold(n_splits=k, shuffle=True)
-    fold_indices = list(kf.split(dataset))
+    fold_indices = list(kf.split(dataset)) # type: ignore
 
     # Create k pairs of dataloaders
     dataloaders = []
