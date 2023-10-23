@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from timm.models.layers import trunc_normal_, DropPath
-from timm.models.registry import register_model
 
 class Block(nn.Module):
     r""" ConvNeXt Block. There are two equivalent implementations:
@@ -17,11 +16,11 @@ class Block(nn.Module):
     """
     def __init__(self, dim, drop_path=0., layer_scale_init_value=1e-6):
         super().__init__()
-        self.dwconv = nn.Conv1d(dim, dim, kernel_size=7, padding=3, groups=dim) # depthwise conv
+        self.dwconv = nn.Conv1d(dim, dim, kernel_size=3, padding=1, groups=dim) # depthwise conv
         self.norm = LayerNorm(dim, eps=1e-6,data_format="channels_first")
-        self.pwconv1 = nn.Conv1d(dim, 4 * dim, kernel_size=1, stride=1, padding=0, groups=1) # pointwise/1x1 convs, implemented with linear layers
+        self.pwconv1 = nn.Conv1d(dim, 2 * dim, kernel_size=1, stride=1, padding=0, groups=1) # pointwise/1x1 convs, implemented with linear layers
         self.act = nn.GELU()
-        self.pwconv2 = nn.Conv1d(4*dim, dim, kernel_size=1, stride=1, padding=0, groups=1)
+        self.pwconv2 = nn.Conv1d(2*dim, dim, kernel_size=1, stride=1, padding=0, groups=1)
         self.gamma = nn.Parameter(layer_scale_init_value * torch.ones((dim)), 
                                     requires_grad=True) if layer_scale_init_value > 0 else None
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
@@ -54,15 +53,15 @@ class ConvNeXt(nn.Module):
         layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
         head_init_scale (float): Init scaling value for classifier weights and biases. Default: 1.
     """
-    def __init__(self, in_chans=3, num_classes=1, 
+    def __init__(self, in_chans=1, num_classes=1, headtype="sigmoid",
                  depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], drop_path_rate=0., 
                  layer_scale_init_value=1e-6, head_init_scale=1.,
                  ):
         super().__init__()
-
+        self.headtype = headtype
         self.downsample_layers = nn.ModuleList() # stem and 3 intermediate downsampling conv layers
         stem = nn.Sequential(
-            nn.Conv1d(in_chans, dims[0], kernel_size=4, stride=4),
+            nn.Conv1d(in_chans, dims[0], kernel_size=2, stride=2),
             LayerNorm(dims[0], eps=1e-6)
         )
         self.downsample_layers.append(stem)
@@ -100,16 +99,16 @@ class ConvNeXt(nn.Module):
     def forward_features(self, x):
         for i in range(4):
             x = self.downsample_layers[i](x)
-            x = self.stages[i](x)
+            x = self.stages[i](x)   
         x = x.mean([-1]) # global average pooling
-        x = nn.BatchNorm1d(x.shape[-1],device=self.norm.weight.device)(x)
-        return x 
+        return self.norm(x.unsqueeze(-1)).squeeze(-1)
 
     def forward(self, x):
         x = x.permute(0,2,1)
         x = self.forward_features(x)
         x = self.head(x)
-        x = nn.Sigmoid()(x)
+#        if self.headtype == "sigmoid":
+#            x = nn.Sigmoid()(x)
         return x
 
 class LayerNorm(nn.Module):
@@ -132,3 +131,4 @@ class LayerNorm(nn.Module):
             x = (x - u) / torch.sqrt(s + self.eps)
             x = self.weight[:,  None] * x + self.bias[:, None]
             return x
+
