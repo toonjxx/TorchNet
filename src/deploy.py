@@ -24,7 +24,7 @@ def main():
     args = parser.parse_args()
 
     device = torch.device(args.device)
-    model = ConvNeXt(depths=[3, 3, 18, 3], dims=[16, 32, 64, 128],in_chans=1,num_classes=1,headtype="sigmoid")
+    model = ConvNeXt(depths=[3, 3, 27, 3], dims=[32, 64, 128, 256],in_chans=1,num_classes=1)
     model.load_state_dict(torch.load(args.checkpoint,map_location='cuda'))
     model.eval()
     model.to(device)
