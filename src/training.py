@@ -1,12 +1,14 @@
 from utils import str2bool
 import torch
 from datasets import create_data_loader,train_val_dataloader_kfold
-from models import ConvNeXt
+import models.convnext as convnext
 from trainers import Trainer_Hyper, Trainer_BP
 import torch.optim.lr_scheduler
 import time
 import argparse
 from torch.backends import cudnn
+import wandb
+
 
 def get_args_parser():
 
@@ -55,7 +57,7 @@ def crossvalidation(args):
 
 
     for fold_idx, (train_dataloader, val_dataloader) in enumerate(dataloaders):
-        model = ConvNeXt.__dict__[args.model](
+        model = convnext.__dict__[args.model](
         drop_path_rate=args.drop_path
         )
         model = model.to(device)
@@ -86,7 +88,10 @@ def train(args):
     checkpoint_dir = f"Checkpoints/train_{model_name}_{timenow}"
     log_dir = f"logs/train_{model_name}_{timenow}"
 
-    model = ConvNeXt(depths=[3, 3, 9, 3], dims=[96, 192, 384, 768],in_chans=args.num_channels,num_classes=args.num_class).to(device)
+    model = convnext.__dict__[args.model](
+        drop_path_rate=args.drop_path
+        )
+    model = model.to(device)
     trainer = Trainer_Hyper(model, train_dataloader, test_dataloader, num_epochs=500,log_dir=log_dir,checkpoint_dir=checkpoint_dir,early_stop_patience=50)
     trainer.train()
 
