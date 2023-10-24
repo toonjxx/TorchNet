@@ -1,11 +1,10 @@
 import yaml
 import pandas as pd
 import argparse
-
 import time
 from collections import defaultdict, deque
 import datetime
-
+import os
 import torch
 import torch.distributed as dist
 import math
@@ -292,5 +291,53 @@ def adjust_learning_rate(optimizer, epoch, args):
             param_group["lr"] = lr
     return lr
 
+# Save model checkpoint
+def save_checkpoint(model, optimizer, args):
+    state = {
+        'model': model.state_dict(),
+        'optimizer': optimizer.state_dict()
+    }
+    if not os.path.exists(args.checkpoint_dir):
+        os.makedirs(args.checkpoint_dir)
+    
+    torch.save(state, args.checkpoint_dir + "/checkpoints.pth.tar")
+    print(f"Saving model checkpoint to {args.checkpoint_dir}")
 
-        
+
+# Load model checkpoint
+def load_checkpoint(checkpoint_path, model, optimizer):
+    print("=> Loading checkpoint from '{checkpoint_path}'}")
+    checkpoint = torch.load(checkpoint_path)
+    model.load_state_dict(checkpoint['model'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+
+
+# early stopping helper function
+class EarlyStopping:
+    def __init__(self,patient,mode,metric="acc"):
+        self.patient = patient
+        self.mode = mode
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+        self.metric = metric
+
+    def __call__(self,score,model,optimizer,args):
+        if self.mode == "min":
+            score = -score
+
+        if self.best_score is None:
+            self.best_score = score
+
+        elif score < self.best_score:
+            self.counter += 1
+            if self.counter >= self.patient:
+                print(f"EarlyStopping! Model does not improve for {self.patient} epochs")
+                print(f"Best {self.metric}: {self.best_score:.4f}")
+                self.early_stop = True
+        else:
+            self.best_score = score
+            save_checkpoint(model, optimizer, args)
+            self.counter = 0
+            return True
+    

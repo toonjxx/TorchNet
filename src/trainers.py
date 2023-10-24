@@ -1,13 +1,11 @@
-from ast import Num
-from email import header
 import os
-from typing import Any
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard.writer import SummaryWriter
 import time
 from torch.optim.lr_scheduler import StepLR
+from utils import EarlyStopping
     
 
 class Trainer_BP:
@@ -83,15 +81,18 @@ class Trainer_Hyper:
         self.train_acc = 0
         self.epochs_since_improvement = 0
 
+        self.train_MetricMornitor = MetricMornitor(modeltype=self.modeltype)
+        self.val_MetricMornitor = MetricMornitor(modeltype=self.modeltype)
+
+
     def train(self):
-        train_MetricMornitor = MetricMornitor(modeltype=self.modeltype)
+        earlyStop = EarlyStopping(patient=self.early_stop_patience,mode='max')
+
         for epoch in range(self.num_epochs):
 
             start_time = time.time()
             self.model.train()
             train_loss = 0
-            train_acc = 0
-            Train_ConfMatrix = torch.zeros(2, 2)
 
             for batch_idx, (data, target) in enumerate(self.train_loader):
                 data, target = data.to(self.device), target.to(self.device)
@@ -102,43 +103,17 @@ class Trainer_Hyper:
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.item()
+                self.train_MetricMornitor.Batch_Update(output,target)
 
-                '''
-                # enable if using BCEWithLogitsLoss
-
-                output = torch.sigmoid(output)
-                predic = torch.round(output)
-
-                TP = torch.eq(target, predic) & torch.eq(target, torch.ones_like(target))
-                TN = torch.eq(target, predic) & torch.eq(target, torch.zeros_like(target))
-                FP = torch.ne(target, predic) & torch.eq(target, torch.zeros_like(target))
-                FN = torch.ne(target, predic) & torch.eq(target, torch.ones_like(target))
-                Train_ConfMatrix[0,0] += TP.sum().item()
-                Train_ConfMatrix[1,1] += TN.sum().item()
-                Train_ConfMatrix[0,1] += FP.sum().item()
-                Train_ConfMatrix[1,0] += FN.sum().item()
-                '''
-                train_MetricMornitor.Batch_Update(output,target)
+            self.train_MetricMornitor.Epoch_Summary()
 
 
-            '''
-            train_loss /= len(self.train_loader)
-            train_acc,train_f1,train_precision,train_recall,train_sensitivity,train_specificity = self.ConfusionMatrix_Cal(Train_ConfMatrix)
-
-            self.train_acc = train_acc
-
-            val_loss,Val_ConfMatrix = self.evaluate()
-            val_acc,val_f1,val_precision,val_recall,val_sensitivity,val_specificity = self.ConfusionMatrix_Cal(Val_ConfMatrix)
-            self.train_writer.add_scalar('loss',train_loss,epoch)
-            self.val_writer.add_scalar('loss',val_loss,epoch)
-            self.train_writer.add_scalar('acc',train_acc,epoch)
-            self.val_writer.add_scalar('acc',val_acc,epoch)
-            self.val_acc = val_acc
-            '''
-
+            val_loss = self.evaluate()
+            self.val_MetricMornitor.Epoch_Summary()
             stop = time.time()
+
             print(f"Epoch [{epoch + 1}/{self.num_epochs}] - Learning rate {self.lr_scheduler.get_last_lr()} - Processing times: {stop-start_time:.2f} seconds")
-            train_MetricMornitor.Epoch_Summary()
+
 
             '''
             print(f"Training: Loss: {train_loss:.4f}, Acc: {train_acc:.4f}, F1: {train_f1:.4f}, Precision: {train_precision:.4f}, Recall: {train_recall:.4f}, Sensitivity: {train_sensitivity:.4f}, Specificity: {train_specificity:.4f}")
@@ -148,6 +123,13 @@ class Trainer_Hyper:
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
             
+            if earlyStop(val_acc):
+                
+
+
+            if earlyStop.early_stop:
+                print("Early stopping")
+                break
 
             if val_acc > self.best_val_acc:
                 self.best_val_acc = val_acc
@@ -172,7 +154,7 @@ class Trainer_Hyper:
     def evaluate(self):
         self.model.eval()
         val_loss = 0
-        Val_ConfMatrix = torch.zeros(2, 2)
+
         with torch.no_grad():
             for data, target in self.val_loader:
                 data, target = data.to(self.device), target.to(self.device)
@@ -180,21 +162,12 @@ class Trainer_Hyper:
                 loss = self.criterion(output, target)
                 val_loss += loss.item()
 
-                # enable if using BCEWithLogitsLoss
-                output = torch.sigmoid(output)
-                predic = torch.round(output)
+                self.val_MetricMornitor.Batch_Update(output,target)
 
-                TP = torch.eq(target, predic) & torch.eq(target, torch.ones_like(target))
-                TN = torch.eq(target, predic) & torch.eq(target, torch.zeros_like(target))
-                FP = torch.ne(target, predic) & torch.eq(target, torch.zeros_like(target))
-                FN = torch.ne(target, predic) & torch.eq(target, torch.ones_like(target))
-                Val_ConfMatrix[0,0] += TP.sum().item()
-                Val_ConfMatrix[1,1] += TN.sum().item()
-                Val_ConfMatrix[0,1] += FP.sum().item()
-                Val_ConfMatrix[1,0] += FN.sum().item()
+        self.val_MetricMornitor.Epoch_Summary()
+
         val_loss /= len(self.val_loader)
-
-        return val_loss,Val_ConfMatrix
+        return val_loss
     
     
 class MetricMornitor():
