@@ -1,6 +1,6 @@
 import torch
 import argparse
-from models import ConvNeXt
+from models.convnext import ConvNeXt
 from utils import load_sample
 import numpy as np
 
@@ -53,7 +53,6 @@ def main():
         predict = predict*170
         print(f'Predicted SBP: {predict}')
     
-
 
 if __name__ == '__main__':
     main()

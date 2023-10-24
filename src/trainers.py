@@ -1,10 +1,14 @@
+from ast import Num
+from email import header
 import os
+from typing import Any
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard.writer import SummaryWriter
 import time
 from torch.optim.lr_scheduler import StepLR
+    
 
 class Trainer_BP:
     def __init__(self, model, train_dataset, val_dataset, num_epochs, learning_rate, log_dir):
@@ -52,10 +56,10 @@ class Trainer_BP:
             print(f"Epoch [{epoch + 1}/{self.num_epochs}], Val Loss: {val_loss:.4f}, Val Acc: {val_acc*140:.4f}")
 
 class Trainer_Hyper:
-    def __init__(self, model, train_loader , val_loader , num_epochs, lr = 0.001,optimizer = None, log_dir=None,checkpoint_dir=None,early_stop_patience=15,lr_scheduler = None):
+    def __init__(self, model, train_loader , val_loader , num_epochs, lr = 0.001,optimizer = None, log_dir=None,checkpoint_dir=None,early_stop_patience=15,lr_scheduler = None,modeltype = "classification"):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model.to(self.device)
-
+        self.modeltype = modeltype
         self.train_loader = train_loader 
         self.val_loader = val_loader 
 
@@ -80,12 +84,15 @@ class Trainer_Hyper:
         self.epochs_since_improvement = 0
 
     def train(self):
+        train_MetricMornitor = MetricMornitor(modeltype=self.modeltype)
         for epoch in range(self.num_epochs):
+
             start_time = time.time()
             self.model.train()
             train_loss = 0
             train_acc = 0
             Train_ConfMatrix = torch.zeros(2, 2)
+
             for batch_idx, (data, target) in enumerate(self.train_loader):
                 data, target = data.to(self.device), target.to(self.device)
                 self.optimizer.zero_grad()
@@ -96,9 +103,10 @@ class Trainer_Hyper:
                 self.optimizer.step()
                 train_loss += loss.item()
 
+                '''
                 # enable if using BCEWithLogitsLoss
-                output = torch.sigmoid(output)
 
+                output = torch.sigmoid(output)
                 predic = torch.round(output)
 
                 TP = torch.eq(target, predic) & torch.eq(target, torch.ones_like(target))
@@ -109,7 +117,11 @@ class Trainer_Hyper:
                 Train_ConfMatrix[1,1] += TN.sum().item()
                 Train_ConfMatrix[0,1] += FP.sum().item()
                 Train_ConfMatrix[1,0] += FN.sum().item()
-                
+                '''
+                train_MetricMornitor.Batch_Update(output,target)
+
+
+            '''
             train_loss /= len(self.train_loader)
             train_acc,train_f1,train_precision,train_recall,train_sensitivity,train_specificity = self.ConfusionMatrix_Cal(Train_ConfMatrix)
 
@@ -122,11 +134,16 @@ class Trainer_Hyper:
             self.train_writer.add_scalar('acc',train_acc,epoch)
             self.val_writer.add_scalar('acc',val_acc,epoch)
             self.val_acc = val_acc
+            '''
 
             stop = time.time()
             print(f"Epoch [{epoch + 1}/{self.num_epochs}] - Learning rate {self.lr_scheduler.get_last_lr()} - Processing times: {stop-start_time:.2f} seconds")
+            train_MetricMornitor.Epoch_Summary()
+
+            '''
             print(f"Training: Loss: {train_loss:.4f}, Acc: {train_acc:.4f}, F1: {train_f1:.4f}, Precision: {train_precision:.4f}, Recall: {train_recall:.4f}, Sensitivity: {train_sensitivity:.4f}, Specificity: {train_specificity:.4f}")
             print(f"Validation: Loss: {val_loss:.4f}, Acc: {val_acc:.4f}, F1: {val_f1:.4f}, Precision: {val_precision:.4f}, Recall: {val_recall:.4f}, Sensitivity: {val_sensitivity:.4f}, Specificity: {val_specificity:.4f}")
+            '''
             
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
@@ -161,13 +178,10 @@ class Trainer_Hyper:
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
                 loss = self.criterion(output, target)
-
                 val_loss += loss.item()
 
                 # enable if using BCEWithLogitsLoss
                 output = torch.sigmoid(output)
-
-
                 predic = torch.round(output)
 
                 TP = torch.eq(target, predic) & torch.eq(target, torch.ones_like(target))
@@ -178,19 +192,50 @@ class Trainer_Hyper:
                 Val_ConfMatrix[1,1] += TN.sum().item()
                 Val_ConfMatrix[0,1] += FP.sum().item()
                 Val_ConfMatrix[1,0] += FN.sum().item()
-
         val_loss /= len(self.val_loader)
 
         return val_loss,Val_ConfMatrix
-    def ConfusionMatrix_Cal(self,ConfusionMatrix):
-        TP = ConfusionMatrix[0,0]
-        TN = ConfusionMatrix[1,1]
-        FP = ConfusionMatrix[0,1]
-        FN = ConfusionMatrix[1,0]
-        acc = (TP+TN)/(TP+TN+FP+FN)
-        f1 = 2*TP/(2*TP+FP+FN)
-        precision = TP/(TP+FP)
-        recall = TP/(TP+FN)
-        sensitivity = TP/(TP+FN)
-        specificity = TN/(TN+FP)
-        return acc,f1,precision,recall,sensitivity,specificity
+    
+    
+class MetricMornitor():
+    def __init__(self,modeltype = "classification"):
+        self.TP = 0
+        self.TN = 0
+        self.FP = 0
+        self.FN = 0
+        self.Accuracy = 0
+        self.Precision = 0
+        self.Recall = 0
+        self.Sensitivity = 0
+        self.Specificity = 0
+        self.F1 = 0
+        self.modeltype = modeltype
+        self.Accum_AE = 0
+        self.num_pred = 0
+
+
+    def Batch_Update(self,predic,target):
+        if self.modeltype == "classification":
+            predic = torch.sigmoid(predic)
+            predic = torch.round(predic)
+            self.TP += (torch.eq(target, predic) & torch.eq(target, torch.ones_like(target))).sum().item()
+            self.TN += (torch.eq(target, predic) & torch.eq(target, torch.zeros_like(target))).sum().item()
+            self.FP += (torch.ne(target, predic) & torch.eq(target, torch.zeros_like(target))).sum().item()
+            self.FN += (torch.ne(target, predic) & torch.eq(target, torch.ones_like(target))).sum().item()
+        elif self.modeltype == "regression":
+            self.Accum_AE += torch.abs(predic - target)
+            self.num_pred += len(predic)
+
+    def Epoch_Summary(self):
+        if self.modeltype == 'classification':
+            
+
+    def ConfusionMatrix_Cal(self):
+        self.acc = (self.TP+self.TN)/(self.TP+self.TN+self.FP+self.FN)
+        self.f1 = 2*self.TP/(2*self.TP+self.FP+self.FN)
+        self.precision = self.TP/(self.TP+self.FP)
+        self.recall = self.TP/(self.TP+self.FN)
+        self.sensitivity = self.TP/(self.TP+self.FN)
+        self.specificity = self.TN/(self.TN+self.FP)
+
+    

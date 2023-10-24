@@ -28,20 +28,27 @@ def get_args_parser():
                         help='Name of model to train')
     parser.add_argument('--drop_path', type=float, default=0., metavar='PCT',
                         help='Drop path rate (default: 0.)')
-    
+    parser.add_argument('--modeltype', type=str, default='classification', help='classification or regression')
+
+
     # Add parser for model training config
     parser.add_argument('--batch_size', type=int, default=256, help='batch size')
     parser.add_argument('--k_fold', type=int, default=5, help='k for kfold')
     parser.add_argument('--num_epochs', type=int, default=200, help='number of epochs')
-    
-    
+    parser.add_argument('--early_stop_patience', type=int, default=15, help='early stop patience')
+    parser.add_argument('--lr_scheduler', type=str, default='StepLR', help='lr scheduler')
+    parser.add_argument('--lr_scheduler_gamma', type=float, default=0.75, help='lr scheduler gamma')
+    parser.add_argument('--lr_scheduler_step_size', type=int, default=10, help='lr scheduler step size')
+    parser.add_argument('--optimizer', type=str, default='AdamW', help='optimizer')
+
+
+
     parser.add_argument('--pin_mem', type=str2bool, default=True,
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
     parser.add_argument('--seed', default=0, type=int)
 
     # Add parser for data
     parser.add_argument('--data_dir', type=str, default='../Data', help='data directory')
-
 
     return parser
 
@@ -97,6 +104,8 @@ def train(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('ConvNeXt training', parents=[get_args_parser()])
+    wandb.login()
+
     args = parser.parse_args()
     crossvalidation(args)
     #train(args)

@@ -1,3 +1,4 @@
 /Data
 src/logs
 src/checkpoints
+src/__pycache__
