@@ -7,36 +7,30 @@ from sklearn.model_selection import KFold
 import pandas as pd
 
 
-
-def create_data_loader(split, batch_size):
-    config = load_config()
-    data_dir = config["data_dir"]
-    data_dir = os.path.abspath(data_dir)
-
+def create_data_loader(split, args):
+    data_dir = os.path.abspath(args.data_dir)
     data_dir = os.path.join(data_dir,split)
     labels_file = Path(os.path.join(data_dir,'Label.csv'))
-    dataset = Build_Dataset(data_dir, labels_file,label_select="Hypertension")
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True,pin_memory=True)
+    dataset = Build_Dataset(data_dir, labels_file,label_select=args.target_name)
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True,pin_memory=args.pin_mem)
     return dataloader
 
-def train_val_dataloader_kfold(split, batch_size, k=5):
-    config = load_config()
-    data_dir = config["data_dir"]
-    data_dir = os.path.abspath(data_dir)
+def train_val_dataloader_kfold(split, args):
+    data_dir = os.path.abspath(args.data_dir)
     data_dir = os.path.join(data_dir,split)
     labels_file = Path(os.path.join(data_dir,'Label.csv'))
-    dataset = Build_Dataset(data_dir, labels_file,label_select="Hypertension")
-    kf = KFold(n_splits=k, shuffle=True)
+    dataset = Build_Dataset(data_dir, labels_file,label_select=args.target_name)
+    kf = KFold(n_splits=args.k_fold, shuffle=True,random_state=args.seed)
     fold_indices = list(kf.split(dataset)) # type: ignore
 
     # Create k pairs of dataloaders
     dataloaders = []
-    for i in range(k):
+    for i in range(args.repeat):
         train_indices, val_indices = fold_indices[i]
         train_dataset = torch.utils.data.Subset(dataset, train_indices)
         val_dataset = torch.utils.data.Subset(dataset, val_indices)
-        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,pin_memory=True)
-        val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False,pin_memory=True)
+        train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,pin_memory=args.pin_mem)
+        val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,pin_memory=args.pin_mem)
         dataloaders.append((train_dataloader, val_dataloader))
     return dataloaders
 
