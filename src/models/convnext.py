@@ -110,35 +110,3 @@ class ConvNeXt(nn.Module):
         x = self.forward_features(x)
         x = self.head(x)
         return x
-
-def Convnext_ShallowPico2(**kwargs):
-    model = ConvNeXt(depths=[3, 3, 9, 3], dims=[16, 32, 64, 128],dim_mul=2,dwconv_kernel_size=3,dwconv_padding=1,downsample_stem=2,**kwargs)
-    return model
-
-def Convnext_ShallowPico4(**kwargs):
-    model = ConvNeXt(depths=[3, 3, 9, 3], dims=[16, 32, 64, 128],dim_mul=4,dwconv_kernel_size=3,dwconv_padding=1,downsample_stem=2,**kwargs)
-    return model
-
-def Convnext_DeepPico2(**kwargs):
-    model = ConvNeXt(depths=[3, 3, 27, 3], dims=[16, 32, 64, 128],dim_mul=2,dwconv_kernel_size=3,dwconv_padding=1,downsample_stem=2,**kwargs)
-    return model
-
-def Convnext_DeepPico4(**kwargs):
-    model = ConvNeXt(depths=[3, 3, 27, 3], dims=[16, 32, 64, 128],dim_mul=4,dwconv_kernel_size=3,dwconv_padding=1,downsample_stem=2,**kwargs)
-    return model
-
-def Convnext_ShallowNano2(**kwargs):
-    model = ConvNeXt(depths=[3, 3, 9, 3], dims=[32, 64, 128, 256],dim_mul=2,dwconv_kernel_size=3,dwconv_padding=1,downsample_stem=2,**kwargs)
-    return model
-
-def Convnext_ShallowNano4(**kwargs):
-    model = ConvNeXt(depths=[3, 3, 9, 3], dims=[32, 64, 128, 256],dim_mul=4,dwconv_kernel_size=3,dwconv_padding=1,downsample_stem=2,**kwargs)
-    return model
-
-def Convnext_DeepNano2(**kwargs):
-    model = ConvNeXt(depths=[3, 3, 27, 3], dims=[32, 64, 128, 256],dim_mul=2,dwconv_kernel_size=3,dwconv_padding=1,downsample_stem=2,**kwargs)
-    return model
-
-def Convnext_DeepNano4(**kwargs):
-    model = ConvNeXt(depths=[3, 3, 27, 3], dims=[32, 64, 128, 256],dim_mul=4,dwconv_kernel_size=3,dwconv_padding=1,downsample_stem=2,**kwargs)
-    return model

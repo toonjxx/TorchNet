@@ -8,6 +8,7 @@ import pandas as pd
 
 
 def create_data_loader(split, args):
+    print("ok")
     data_dir = os.path.abspath(args.data_dir)
     data_dir = os.path.join(data_dir,split)
     labels_file = Path(os.path.join(data_dir,'Label.csv'))
@@ -74,7 +75,6 @@ class Build_Dataset(Dataset):
                 labels = None
         else:
             labels = None  # Handle cases where labels are not found
-
         # Convert to PyTorch tensors
         if data is not None:
             data = torch.FloatTensor(data.values)

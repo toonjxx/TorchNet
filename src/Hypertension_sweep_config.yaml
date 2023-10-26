@@ -1,0 +1,72 @@
+program: main.py
+method: grid
+metric:
+  name: val_accuracy
+  goal: maximize
+parameters:
+  # cuda setting
+  device:
+    values: ["cuda"]
+  pin_mem:
+    values: [True]
+  seed:
+    values: [42]
+
+  # path setting
+  data_dir:
+    values: ["../Data"]
+  log_dir:
+    values: ["logs"]
+  checkpoint_dir:
+    values: ["Checkpoints"]
+
+  # fold and data setting
+  k_fold: 
+    values: [5]
+  repeat:
+    values: [5]
+  target_name:
+    values: ["Hypertension"]
+
+  # model setting
+  modeltype:
+    values: ["classification"]
+  depths:
+    values:
+      - [3,3,9,3]
+      - [3,3,27,3]
+      - [2,2,6,2]
+      - [2,2,18,2]
+  dims:
+    values:
+      - [8,16,32,64]
+      - [16,32,64,128]
+      - [32,64,128,256]
+      - [64,128,256,512]
+  num_channels:
+    values: [1]
+  num_class:
+    values: [1]
+  drop_path:
+    values: 
+     - 0
+     - 0.25
+     - 0.5
+
+  # training setting
+  optimizer:
+    values: ["AdamW"]
+  lr:
+    values: [0.001]
+  batch_size: 
+    values: [512]
+  num_epochs:
+    values: [500]
+  early_stop_patience:
+    values: [20]
+  lr_scheduler_step_size:
+    values: [10]
+  lr_scheduler_gamma:
+    values: [0.75]
+
+

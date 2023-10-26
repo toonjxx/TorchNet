@@ -60,8 +60,8 @@ def save_checkpoint(model, optimizer, checkpoint_dir):
     if not os.path.exists(checkpoint_dir):
         os.makedirs(checkpoint_dir)
     
-    #torch.save(state, checkpoint_dir + "/checkpoints.pth.tar")
-    #print(f"Saving model checkpoint to {checkpoint_dir}")
+    torch.save(state, checkpoint_dir + "/checkpoints.pth.tar")
+    print(f"Saving model checkpoint to {checkpoint_dir}")
 
 
 # Load model checkpoint
@@ -163,3 +163,5 @@ class MetricMornitor():
         self.Recall = self.TP/(self.TP+self.FN)
         self.Sensitivity = self.TP/(self.TP+self.FN)
         self.Specificity = self.TN/(self.TN+self.FP)
+
+

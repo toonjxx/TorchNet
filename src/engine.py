@@ -1,3 +1,4 @@
+from pyexpat import model
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -50,27 +51,28 @@ class Engine:
             metric = "Accuracy"
         else:
             metric = "MAE"
+
         earlyStop = EarlyStopping(patient=self.args.early_stop_patience,mode='max',metric=metric)
 
         for epoch in range(self.args.num_epochs):
             print(f"Epoch [{epoch + 1}/{self.args.num_epochs}] - Learning rate {self.lr_scheduler.get_last_lr()}")
+            
             start_time = time.time()
-
-            self.model.train(True)
+            self.model.train()
             train_loss = 0
 
             for batch_idx, (data, target) in enumerate(self.train_loader):
                 data, target = data.to(self.device), target.to(self.device)
                 self.optimizer.zero_grad()
                 output = self.model(data)
-
+    
                 loss = self.criterion(output, target)
-
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.item()
                 self.train_MetricMornitor.Batch_Update(output,target)
 
+            print(train_loss)
             self.train_MetricMornitor.Epoch_Summary()
 
             self.evaluate()
@@ -96,7 +98,6 @@ class Engine:
                 output = self.model(data)
                 loss = self.criterion(output, target)
                 val_loss += loss.item()
-
                 self.val_MetricMornitor.Batch_Update(output,target)
 
         self.val_MetricMornitor.Epoch_Summary()
